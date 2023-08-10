@@ -1,8 +1,13 @@
 use leptos::*;
 use leptos_meta::*;
-use leptos_router::*;
+// use leptos_router::*;
 
-use crate::model:conversation::{Conversation, Message};
+mod components;
+use components::chat_area::ChatArea;
+use components::type_area::TypeArea;
+
+use crate::api::converse;
+use crate::model::conversation::{Conversation, Message};
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -11,16 +16,36 @@ pub fn App(cx: Scope) -> impl IntoView {
 
     let (conversation, set_conversation) = create_signal(cx, Conversation::new());
 
-    let send = create_action(cx, move | new_message: &String | {
+    let send = create_action(cx, move |new_message: &String| {
         let user_message = Message {
             text: new_message.clone(),
             user: true,
         };
         set_conversation.update(move |c| {
-            c.message.push(user_message);
+            c.messages.push(user_message);
         });
+        converse(cx, conversation.get())
+    });
 
+    create_effect(cx, move |_| {
+        if let Some(_) = send.input().get() {
+            let model_message = Message {
+                text: String::from("..."),
+                user: false,
+            };
 
+            set_conversation.update(move |c| {
+                c.messages.push(model_message);
+            });
+        }
+    });
+
+    create_effect(cx, move |_| {
+        if let Some(Ok(response)) = send.value().get() {
+            set_conversation.update(move |c| {
+                c.messages.last_mut().unwrap().text = response;
+            });
+        }
     });
 
     view! { cx,
@@ -30,7 +55,6 @@ pub fn App(cx: Scope) -> impl IntoView {
 
         // sets the document title
         <Title text="Welcome to Leptos"/>
-            {conversation.get()}
         <ChatArea conversation/>
         <TypeArea send/>
     }
